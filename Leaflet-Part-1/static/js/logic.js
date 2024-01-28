@@ -1,24 +1,38 @@
 
 let myMap = L.map("map", {
-    center: [36.7783, -119.4179],
+    center: [36.7783, -105.4179],
     zoom: 5
   });
   
   // Adding the tile layer
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(myMap);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(myMap);
   
+// let info = L.control({
+// position: "bottomright"
+// });
+
 // Use this link to get the GeoJSON data.
-  let link = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson";
+let link = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson";
+
+// I didn't want to manually define buckets, so I used a lot of scaling to make this work.
+// This makes the color scale have higher resolution for more shallow earthquakes as
+// most earthquakes in the continental US are quite shallow relative to the world.
+let numBuckets = 8
+let legendColorFactorAdjustment = 4
 
 
 function radiusCalc(magnitude) {
 
     // I want to really highlight big earthquakes and ignore tiny ones,
-    // so I chose to square the magnitude
-    let radiusMeters = (magnitude**2)
-    return radiusMeters
+    // so I chose to raise the magnitude to the 1.5 power
+    if (magnitude >= 0) {
+        let radius = (2*magnitude)**(1.5)
+        return radius
+    } else {
+        return 0
+    }
 
 }
 
@@ -51,13 +65,40 @@ function depthColor(depthCoord,min,max) {
     let place = depthCoord - min
     let factor = place / range
 
-    // creating 5 buckets of depth color based on the range
-    factor = Math.floor(factor * 10) / 10
+    // remap the factor for higher resolution at low depths, as it seems most
+    // continental US earthquakes are very shallow
+    factor = factor**(1/legendColorFactorAdjustment)
 
-    // coloring based on depth. Least deep are red, most deep are yellow.
-    let color = interpolateColor("rgb(255,255,0)","rgb(255,0,0)",factor)
+    // coloring based on depth. Least deep are cyan, most deep are red.
+    let color = interpolateColor("rgb(0,255,255)","rgb(255,0,0)",factor)
 
     return color
+
+}
+
+function getDepthBuckets(depthMin,depthMax,numBuckets) {
+
+    let range = depthMax - depthMin
+    let depthBuckets = []
+
+    for (let i = 0; i < numBuckets; i++) {
+
+        depthBuckets.push((depthMin+range*(((1/numBuckets)*i)**legendColorFactorAdjustment)).toFixed(2))
+    
+    }
+
+    legendBuckets = []
+
+    for (let i = 0; i < numBuckets-1; i++) {
+
+        bucket = `${depthBuckets[i]} - ${depthBuckets[i+1]}`
+        legendBuckets.push(bucket)
+    
+    }
+
+    legendBuckets.push(`${depthBuckets[numBuckets-1]}+`)
+
+    return [depthBuckets,legendBuckets]
 
 }
 
@@ -89,17 +130,40 @@ d3.json(link).then(function(response) {
         // but this seems better.
         newMarker = L.circleMarker([location.coordinates[1], location.coordinates[0]],{
                  radius : radiusCalc(earthquake.properties.mag),
-            fillOpacity : .6,
-                  color : depthColor(location.coordinates[2],minDepth,maxDepth),
-                 weight : 0
+            fillOpacity : .8,
+              fillColor : depthColor(location.coordinates[2],minDepth,maxDepth,numBuckets),
+                  color : "black",
+                 weight : 1
         })
         
-        newMarker.bindPopup(earthquake.properties.place + "<br> Magnitude: " + earthquake.properties.mag.toFixed(2) + "<br> Depth: " + location.coordinates[2].toFixed(2))
+        newMarker.bindPopup(`<h3> ${earthquake.properties.place}` + "<h4> Magnitude: " + earthquake.properties.mag.toFixed(2) + "<br> Depth: " + location.coordinates[2].toFixed(2))
 
         newMarker.addTo(myMap);
       }
 
     }
   
-  });
+
+    // Legend (some code used from https://gis.stackexchange.com/questions/133630/adding-leaflet-legend)
+    var legend = L.control({position: 'bottomleft'});
+    legend.onAdd = function () {
+
+    var div = L.DomUtil.create('div', 'info legend');
+    labels = ['<strong>Depth</strong>'],
+    depthBuckets = getDepthBuckets(minDepth,maxDepth,numBuckets)
+
+    for (var i = 0; i < depthBuckets[0].length; i++) {
+
+            div.innerHTML += 
+            labels.push(
+                '<i class="square" color=' + depthColor(depthBuckets[0][i],minDepth,maxDepth,numBuckets) + '"></i> ' +
+            (depthBuckets[1][i] ? depthBuckets[1][i] : '+'));
+
+        }
+        div.innerHTML = labels.join('<br>');
+    return div;
+    };
+    legend.addTo(myMap);
+
+});
 
