@@ -37,11 +37,3 @@ html {
 .legend .max {
   float: right;
 }
-
-.square {
-  width: 100%;
-  height: 0;
-  padding-top: 100%;
-  color:#555;
-  background-color: #ccc;
-}
