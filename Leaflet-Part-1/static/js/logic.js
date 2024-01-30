@@ -154,13 +154,12 @@ d3.json(link).then(function(response) {
 
     for (var i = 0; i < depthBuckets[0].length; i++) {
 
-            div.innerHTML += 
-            labels.push(
-                '<i class="square" color=' + depthColor(depthBuckets[0][i],minDepth,maxDepth,numBuckets) + '"></i> ' +
-            (depthBuckets[1][i] ? depthBuckets[1][i] : '+'));
+        labels.push("<li style=\"background-color: " + depthColor(depthBuckets[0][i],minDepth,maxDepth,numBuckets) + "\"></li>" + (depthBuckets[1][i] ? depthBuckets[1][i] : '+'));
 
         }
+
         div.innerHTML = labels.join('<br>');
+        
     return div;
     };
     legend.addTo(myMap);
